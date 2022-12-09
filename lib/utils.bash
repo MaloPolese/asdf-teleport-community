@@ -5,7 +5,7 @@ set -euo pipefail
 # TODO: Ensure this is the correct GitHub homepage where releases can be downloaded for teleport-community.
 GH_REPO="https://github.com/gravitational/teleport/"
 TOOL_NAME="teleport-community"
-# TOOL_TEST="teleport-community --help"
+TOOL_TEST="tsh version"
 
 OS="${OS:-unknown}"
 ARCH="${ARCH:-unknown}"
@@ -117,19 +117,27 @@ download_release() {
 install_version() {
   local install_type="$1"
   local version="$2"
-  # the directory where Teleport binaries will be located
-  local bindir=/usr/local/bin
-  # the directory where Teleport will keep its state/data
-  local vardir=/var/lib/teleport
+  local install_path="$3"
 
   if [ "$install_type" != "version" ]; then
     fail "asdf-$TOOL_NAME supports release installs only"
   fi
 
   (
-    mkdir -p $vardir $bindir
-    cd "$ASDF_DOWNLOAD_PATH"
-    cp -f teleport tctl tsh tbot $bindir || exit 1
+    mkdir -p "$install_path"
+
+    cp -r "$ASDF_DOWNLOAD_PATH"/* "$install_path"
+
+    mkdir -p "$install_path"/bin
+    mv "$install_path"/teleport "$install_path"/bin/teleport
+    mv "$install_path"/tctl     "$install_path"/bin/tctl
+    mv "$install_path"/tsh      "$install_path"/bin/tsh
+    mv "$install_path"/tbot     "$install_path"/bin/tbot
+
+    local tool_cmd
+    tool_cmd="$(echo "$TOOL_TEST" | cut -d' ' -f1)"
+    test -x "$install_path/bin/$tool_cmd" || fail "Expected $install_path/bin/$tool_cmd to be executable."
+
     echo "$TOOL_NAME $version installation was successful!"
   ) || (
     fail "An error occurred while installing $TOOL_NAME $version."
@@ -149,6 +157,18 @@ install_version() {
   #   rm -rf "$install_path"
   #   fail "An error occurred while installing $TOOL_NAME $version."
   # )
+}
+
+uninstall() {
+  # the directory where Teleport binaries will be located
+  local bindir=/usr/local/bin
+  (
+    cd $bindir
+    rm teleport tctl tsh tbot || exit 1
+    echo "$TOOL_NAME was uninstalled successfully!"
+  ) || (
+    fail "An error occurred while uninstalling $TOOL_NAME."
+  )
 }
 
 uninstall() {
