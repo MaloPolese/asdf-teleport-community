@@ -2,10 +2,12 @@
 
 set -euo pipefail
 
-# TODO: Ensure this is the correct GitHub homepage where releases can be downloaded for teleport-community.
-GH_REPO="https://github.com/MaloPolese/asdf-teleport-community"
+GH_REPO="https://github.com/gravitational/teleport/"
 TOOL_NAME="teleport-community"
-TOOL_TEST="teleport-community --help"
+TOOL_TEST="tsh version"
+
+OS="${OS:-unknown}"
+ARCH="${ARCH:-unknown}"
 
 fail() {
   echo -e "asdf-$TOOL_NAME: $*"
@@ -14,7 +16,6 @@ fail() {
 
 curl_opts=(-fsSL)
 
-# NOTE: You might want to remove this if teleport-community is not hosted on GitHub releases.
 if [ -n "${GITHUB_API_TOKEN:-}" ]; then
   curl_opts=("${curl_opts[@]}" -H "Authorization: token $GITHUB_API_TOKEN")
 fi
@@ -26,14 +27,59 @@ sort_versions() {
 
 list_github_tags() {
   git ls-remote --tags --refs "$GH_REPO" |
-    grep -o 'refs/tags/.*' | cut -d/ -f3- |
-    sed 's/^v//' # NOTE: You might want to adapt this sed to remove non-version strings from tags
+    grep -oE 'refs/tags/v[0-9]+.[0-9]+.[0-9]+$' |
+    cut -d/ -f3- |
+    sed 's/^v//' |
+    sort -V
 }
 
 list_all_versions() {
-  # TODO: Adapt this. By default we simply list the tag names from GitHub releases.
-  # Change this function if teleport-community has other means of determining installable versions.
   list_github_tags
+}
+
+detect_os() {
+  if [ "$OS" = "unknown" ]; then
+    case $(uname | tr '[:upper:]' '[:lower:]') in
+    linux*)
+      echo 'linux'
+      ;;
+    darwin*)
+      fail 'darwin based os is not supported yet'
+      ;;
+    msys* | cygwin* | mingw* | nt | win*)
+      fail 'windows based os is not supported yet'
+      ;;
+    *)
+      fail "Unknown operating system. Please provide the operating system version by setting \$OS."
+      ;;
+    esac
+  else
+    echo "$OS"
+  fi
+}
+
+detect_arch() {
+  if [ "$ARCH" = "unknown" ]; then
+    case $(uname -m) in
+    x86_64)
+      echo "amd64"
+      ;;
+    i386)
+      echo "386"
+      ;;
+    armv7l)
+      echo "arm"
+      ;;
+    aarch64)
+      echo "arm64"
+      ;;
+    **)
+      fail "ERROR: Your system's architecture isn't officially supported or couldn't be determined. \nPlease refer to the installation guide for more information: \nhttps://goteleport.com/docs/installation/"
+      ;;
+    esac
+  else
+    echo "$ARCH"
+  fi
 }
 
 download_release() {
@@ -41,8 +87,17 @@ download_release() {
   version="$1"
   filename="$2"
 
-  # TODO: Adapt the release URL convention for teleport-community
-  url="$GH_REPO/archive/v${version}.tar.gz"
+  KERNEL_VERSION=$(uname -r)
+  MIN_VERSION="2.6.23"
+  if [ $MIN_VERSION != "$(echo -e "$MIN_VERSION\n$KERNEL_VERSION" | sort -V | head -n1)" ]; then
+    echo "ERROR: Teleport requires Linux kernel version $MIN_VERSION+"
+    exit 1
+  fi
+
+  os=$(detect_os)
+  arch=$(detect_arch "$os")
+
+  url="https://cdn.teleport.dev/teleport-v${version}-${os}-${arch}-bin.tar.gz"
 
   echo "* Downloading $TOOL_NAME release $version..."
   curl "${curl_opts[@]}" -o "$filename" -C - "$url" || fail "Could not download $url"
@@ -51,7 +106,7 @@ download_release() {
 install_version() {
   local install_type="$1"
   local version="$2"
-  local install_path="${3%/bin}/bin"
+  local install_path="$3"
 
   if [ "$install_type" != "version" ]; then
     fail "asdf-$TOOL_NAME supports release installs only"
@@ -59,16 +114,21 @@ install_version() {
 
   (
     mkdir -p "$install_path"
+
     cp -r "$ASDF_DOWNLOAD_PATH"/* "$install_path"
 
-    # TODO: Assert teleport-community executable exists.
+    mkdir -p "$install_path"/bin
+    mv "$install_path"/teleport "$install_path"/bin/teleport
+    mv "$install_path"/tctl "$install_path"/bin/tctl
+    mv "$install_path"/tsh "$install_path"/bin/tsh
+    mv "$install_path"/tbot "$install_path"/bin/tbot
+
     local tool_cmd
     tool_cmd="$(echo "$TOOL_TEST" | cut -d' ' -f1)"
-    test -x "$install_path/$tool_cmd" || fail "Expected $install_path/$tool_cmd to be executable."
+    test -x "$install_path/bin/$tool_cmd" || fail "Expected $install_path/bin/$tool_cmd to be executable."
 
     echo "$TOOL_NAME $version installation was successful!"
   ) || (
-    rm -rf "$install_path"
     fail "An error occurred while installing $TOOL_NAME $version."
   )
 }
