@@ -44,7 +44,7 @@ detect_os() {
       echo 'linux'
       ;;
     darwin*)
-      fail 'darwin based os is not supported yet'
+      echo 'darwin'
       ;;
     msys* | cygwin* | mingw* | nt | win*)
       fail 'windows based os is not supported yet'
@@ -70,7 +70,7 @@ detect_arch() {
     armv7l)
       echo "arm"
       ;;
-    aarch64)
+    arm64 | aarch64)
       echo "arm64"
       ;;
     **)
