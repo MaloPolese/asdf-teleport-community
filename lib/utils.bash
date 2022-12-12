@@ -44,7 +44,7 @@ detect_os() {
       echo 'linux'
       ;;
     darwin*)
-      fail 'darwin based os is not supported yet'
+      echo 'darwin'
       ;;
     msys* | cygwin* | mingw* | nt | win*)
       fail 'windows based os is not supported yet'
@@ -70,7 +70,7 @@ detect_arch() {
     armv7l)
       echo "arm"
       ;;
-    aarch64)
+    arm64 | aarch64)
       echo "arm64"
       ;;
     **)
@@ -97,8 +97,13 @@ download_release() {
   os=$(detect_os)
   arch=$(detect_arch "$os")
 
+  if [ "$os" = "darwin" ] && [ "$arch" = "arm64" ]; then
+    fail "ERROR: Teleport does not support darwin arm64 yet"
+  fi
+
   url="https://cdn.teleport.dev/teleport-v${version}-${os}-${arch}-bin.tar.gz"
 
+  https://cdn.teleport.dev/teleport-v${version}-${os}-${arch}-bin.tar.gz
   echo "* Downloading $TOOL_NAME release $version..."
   curl "${curl_opts[@]}" -o "$filename" -C - "$url" || fail "Could not download $url"
 }
@@ -118,16 +123,30 @@ install_version() {
     cp -r "$ASDF_DOWNLOAD_PATH"/* "$install_path"
 
     mkdir -p "$install_path"/bin
-    mv "$install_path"/teleport "$install_path"/bin/teleport
-    mv "$install_path"/tctl "$install_path"/bin/tctl
-    mv "$install_path"/tsh "$install_path"/bin/tsh
-    mv "$install_path"/tbot "$install_path"/bin/tbot
+
+    if [ -f "$install_path"/teleport ]; then
+      mv "$install_path"/teleport "$install_path"/bin/teleport
+      echo "install teleport binary ok"
+    fi
+    if [ -f "$install_path"/tctl ]; then
+      mv "$install_path"/tctl "$install_path"/bin/tctl
+      echo "install tctl binary ok"
+    fi
+    if [ -f "$install_path"/tsh ]; then
+      mv "$install_path"/tsh "$install_path"/bin/tsh
+      echo "install tsh binary ok"
+    fi
+
+    if [ -f "$install_path"/tbot ]; then
+      mv "$install_path"/tbot "$install_path"/bin/tbot
+      echo "install tbot binary ok"
+    fi
 
     local tool_cmd
     tool_cmd="$(echo "$TOOL_TEST" | cut -d' ' -f1)"
     test -x "$install_path/bin/$tool_cmd" || fail "Expected $install_path/bin/$tool_cmd to be executable."
 
-    echo "$TOOL_NAME $version installation was successful!"
+    echo "=> $TOOL_NAME $version installation was successful!"
   ) || (
     fail "An error occurred while installing $TOOL_NAME $version."
   )
