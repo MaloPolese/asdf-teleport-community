@@ -108,6 +108,8 @@ install_version() {
   local version="$2"
   local install_path="$3"
 
+  major_version=$(echo "$version" | cut -d. -f1)
+
   if [ "$install_type" != "version" ]; then
     fail "asdf-$TOOL_NAME supports release installs only"
   fi
@@ -119,9 +121,14 @@ install_version() {
 
     mkdir -p "$install_path"/bin
     mv "$install_path"/teleport "$install_path"/bin/teleport
-    mv "$install_path"/tctl "$install_path"/bin/tctl
-    mv "$install_path"/tsh "$install_path"/bin/tsh
     mv "$install_path"/tbot "$install_path"/bin/tbot
+    if [ "$major_version" -gt 16 ]; then
+      mv "$install_path"/tctl.app/Contents/MacOS/tctl "$install_path"/bin/tctl
+      mv "$install_path"/tsh.app/Contents/MacOS/tsh "$install_path"/bin/tsh
+    else
+      mv "$install_path"/tctl "$install_path"/bin/tctl
+      mv "$install_path"/tsh "$install_path"/bin/tsh
+    fi
 
     local tool_cmd
     tool_cmd="$(echo "$TOOL_TEST" | cut -d' ' -f1)"
