@@ -124,8 +124,8 @@ install_version() {
     mv "$install_path"/teleport "$install_path"/bin/teleport
     mv "$install_path"/tbot "$install_path"/bin/tbot
     if [ "$os" = "darwin" ] && [ "$major_version" -gt "16" ]; then
-      mv "$install_path"/tctl.app/Contents/MacOS/tctl "$install_path"/bin/tctl
-      mv "$install_path"/tsh.app/Contents/MacOS/tsh "$install_path"/bin/tsh
+      ln -s "$install_path/tsh.app/Contents/MacOS/tsh" "$install_path/bin/tsh"
+      ln -s "$install_path/tctl.app/Contents/MacOS/tctl" "$install_path/bin/tctl"
     else
       mv "$install_path"/tctl "$install_path"/bin/tctl
       mv "$install_path"/tsh "$install_path"/bin/tsh
